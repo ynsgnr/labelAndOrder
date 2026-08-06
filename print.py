@@ -11,6 +11,9 @@ Prints ONE sticker first, waits for your approval, then prints the rest.
     py print.py out --test                    # print only the first, then stop
     py print.py out --rest                    # print all except the first
     py print.py out --serial COM5 --paper tag_90r_90p --timini ../TiMini-Print
+
+The generator already draws stickers at the S001's true printed size (including the
+paper-advance/length calibration), so this just streams each PNG to TiMini as-is.
 """
 from __future__ import annotations
 import argparse
@@ -20,9 +23,10 @@ import subprocess
 import sys
 
 
-def print_one(png: str, serial: str, model: str, paper: str, timini_dir: str) -> None:
-    cmd = [sys.executable, "-m", "timiniprint",
-           "--serial", serial, "--printer-model", model, "--paper", paper, png]
+def print_one(png, serial, model, paper, timini_dir) -> None:
+    # TiMini runs with cwd in its own checkout, so pass an absolute sticker path.
+    cmd = [sys.executable, "-m", "timiniprint", "--serial", serial,
+           "--printer-model", model, "--paper", paper, os.path.abspath(png)]
     print(f"  -> {os.path.basename(png)}")
     subprocess.run(cmd, cwd=timini_dir, check=True)
 

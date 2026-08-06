@@ -9,17 +9,25 @@ on an Orgstra **S001** (Xinye) label printer via
 
 ![examples](examples/preview.png)
 
+> **Note:** the sizing (dot pitch, feed calibration, bleed compensation, printable
+> area) is tuned for the **Orgstra S001**. On other printers the fasteners may come
+> out slightly off — adjust `FEED_CAL`, `DPMM`, `LINE_BLEED`, and the `W`/`H`
+> printable size at the top of `gen.py`, and measure your first sticker.
+
 ## What it does
 
 - **`gen.py`** — generates one PNG per size. Nuts are drawn by ISO hex
-  width-across-flats, screws by real Ø × length. Anything larger than the label
-  runs off the edge and gets cut — by design.
+  width-across-flats, screws by real Ø × length. Optional head shapes, drive
+  icons, and a nyloc variant. Anything larger than the label runs off the edge
+  and gets cut — by design.
 - **`print.py`** — prints a folder of stickers on the S001 through the TiMini CLI:
   one test sticker, you approve, then it prints the rest.
 
-Everything is drawn at **8 dot/mm** at the printer's printable size
-(280 × 90 dots = 35 × 11.25 mm), so the print is **1:1** — no scaling, real
-dimensions.
+The head axis prints at **8 dot/mm**; the S001's paper-advance runs long, so the
+generator draws the length axis at a calibrated pitch (`FEED_CAL`, from an 8 mm
+feature measuring ~9.5 mm) — fasteners come out **true size** and the unused
+length is left white. Set `FEED_CAL = 1.0` in `gen.py` for a printer whose feed
+already matches the head.
 
 ## Install
 
@@ -47,6 +55,18 @@ uv run gen.py M3 M5 M8 M5x50 M4x20 --out out --sheet
 - PNGs are written to `out/` (`M5_nut.png`, `M5x50_screw.png`).
 - `--sheet` also writes `_preview.png` so you can eyeball the batch.
 
+**Tags** — add `:tag` after the size (any order) to vary the drawing:
+
+| Tag | Applies to | Effect |
+|-----|-----------|--------|
+| `nylon` (`nyloc`, `lock`) | nut | dotted insert ring, labelled "Nylon" |
+| `pan` (`round`, `dome`, `wall`) | screw | rounded outer head face |
+| `csk` (`flat`, `countersunk`) | screw | flat face, countersunk taper into the shaft |
+| `hex` (default) | screw | flat hex-bolt head block |
+| `philips` `pozi` `torx` `slot` `square` `allen` | screw | drive icon in the top-right |
+
+Examples: `M5:nylon` · `M4x20:pan:philips` · `M5x30:csk:pozi` · `M3x8:torx`
+
 ## Print
 
 Printing depends on **[TiMini-Print](https://github.com/ynsgnr/TiMini-Print)**, the
@@ -71,12 +91,15 @@ README for pairing).
 |------|----------|
 | Nut hex width-across-flats | ISO 4032 (M3 = 5.5, M4 = 7, M5 = 8, M6 = 10, M8 = 13 mm …) |
 | Bolt head (WAF × height) | ISO 4017 |
-| Shaft Ø | nominal M-size |
+| Shaft Ø | nominal M-size (edge-measured, bleed-compensated) |
 | Shaft length | the mm value you give (`M5x50` → 50 mm) |
 
-The printable head is **11.25 mm** (the S001 head is 12 mm but the protocol reserves
-6 dots), so a nut wider than that clips top/bottom — intentional. For guaranteed
-real-world size, keep the `tag_90r_90p` preset and measure your first sticker.
+The identifying dimensions — **shaft Ø × length** — print true size; the head is a
+visual cue (drawn ISO hex-bolt size, ~5.5 mm across for M3, and varies in reality
+by head type). The printable head axis is **11.25 mm** (the S001 head is 12 mm but
+the protocol reserves 6 dots), so a nut wider than that clips top/bottom —
+intentional. Keep the `tag_90r_90p` preset and, on a new printer, measure your
+first sticker and tune `FEED_CAL` in `gen.py` if the length is off.
 
 ## Requirements
 
