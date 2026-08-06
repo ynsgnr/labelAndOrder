@@ -1,0 +1,5 @@
+# gen.py (sticker generation)
+pillow>=10
+
+# print.py additionally needs a TiMini-Print checkout (which brings pyserial):
+#   https://github.com/ynsgnr/TiMini-Print

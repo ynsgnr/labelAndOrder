@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# virtual envs
+.venv/
+venv/
+
+# generated stickers / previews (keep committed samples under examples/)
+out/
+out_*/
+/*.png

@@ -1,0 +1,10 @@
+[project]
+name = "labelandorder"
+version = "0.1.0"
+description = "Actual-size nut & bolt organisation labels for thermal label printers"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["pillow>=10"]
+
+[tool.uv]
+package = false
