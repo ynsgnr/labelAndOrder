@@ -17,9 +17,9 @@ on an Orgstra **S001** (Xinye) label printer via
 ## What it does
 
 - **`gen.py`** — generates one PNG per size. Nuts are drawn by ISO hex
-  width-across-flats, screws by real Ø × length. Optional head shapes, drive
-  icons, and a nyloc variant. Anything larger than the label runs off the edge
-  and gets cut — by design.
+  width-across-flats, screws and wall plugs by real Ø × length. Optional head
+  shapes, drive icons, a nyloc variant and a plug kind. Anything larger than the
+  label runs off the edge and gets cut — by design.
 - **`print.py`** — prints a folder of stickers on the S001 through the TiMini CLI:
   one test sticker, you approve, then it prints the rest.
 
@@ -52,7 +52,9 @@ uv run gen.py M3 M5 M8 M5x50 M4x20 --out out --sheet
 ```
 
 - `M5` → nut, `M5x50` → screw (Ø5 × 50 mm). Decimals are fine: `M2.5`.
-- PNGs are written to `out/` (`M5_nut.png`, `M5x50_screw.png`).
+- `SX6x30:plug` → wall plug (Ø6 × 30 mm). Plugs aren't threaded, so the size
+  needs no `M`; any letter prefix is kept as the range name (`SX 6x30`).
+- PNGs are written to `out/` (`M5_nut.png`, `M5x50_screw.png`, `SX_6x30_plug.png`).
 - `--sheet` also writes `_preview.png` so you can eyeball the batch.
 
 **Tags** — add `:tag` after the size (any order) to vary the drawing:
@@ -64,8 +66,9 @@ uv run gen.py M3 M5 M8 M5x50 M4x20 --out out --sheet
 | `csk` (`flat`, `countersunk`) | screw | flat face, countersunk taper into the shaft |
 | `hex` (default) | screw | flat hex-bolt head block |
 | `philips` `pozi` `torx` `slot` `square` `allen` | screw | drive icon in the top-right |
+| `plug` (`anchor`, `dowel`, `wallplug`) | — | draws a wall plug instead: collar, ribbed sleeve, expansion slot, no drive icon |
 
-Examples: `M5:nylon` · `M4x20:pan:philips` · `M5x30:csk:pozi` · `M3x8:torx`
+Examples: `M5:nylon` · `M4x20:pan:philips` · `M5x30:csk:pozi` · `M3x8:torx` · `SX6x30:plug`
 
 ## Print
 
@@ -93,6 +96,7 @@ README for pairing).
 | Bolt head (WAF × height) | ISO 4017 |
 | Shaft Ø | nominal M-size (edge-measured, bleed-compensated) |
 | Shaft length | the mm value you give (`M5x50` → 50 mm) |
+| Wall plug Ø × length | the values you give (`SX6x30` → Ø6 × 30 mm, collar included) |
 
 The identifying dimensions — **shaft Ø × length** — print true size; the head is a
 visual cue (drawn ISO hex-bolt size, ~5.5 mm across for M3, and varies in reality

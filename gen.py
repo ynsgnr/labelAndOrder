@@ -5,6 +5,7 @@ ACTUAL SIZE; anything larger than the sticker runs off the edge and is cut.
 """
 from __future__ import annotations
 import math
+from string import ascii_uppercase
 from PIL import Image, ImageDraw, ImageFont
 
 DPMM = 8
@@ -46,6 +47,9 @@ DRIVES = {"philips", "phillips", "ph", "cross", "pozi", "pozidriv", "pz",
 # Nut variants (tag after the size, e.g. M5:nylon).
 NUT_TYPES = {"nylon": "nylon", "nyloc": "nylon", "nylock": "nylon",
              "lock": "nylon", "insert": "nylon"}
+# Wall plugs / anchors (tag after the size, e.g. SX6x30:plug). Not threaded, so
+# the size is a plain Ø x length with no M prefix and no drive icon.
+PLUG_TYPES = {"plug", "plugs", "wallplug", "anchor", "dowel", "raw", "rawlplug"}
 
 
 def _font(px: int) -> ImageFont.FreeTypeFont:
@@ -123,6 +127,26 @@ def draw_screw(d: ImageDraw.ImageDraw, x0, cy, m, length_mm, band_h, shape="hex"
         d.line([x, top, x - 3, bot], fill=BLACK, width=1)
 
 
+def draw_plug(d: ImageDraw.ImageDraw, x0, cy, dia_mm, length_mm, band_h):
+    """Wall-plug side profile, drawn like a screw shaft but with no head/drive:
+    a collar (wall-face lip), a ribbed expansion sleeve and the expansion slot.
+    Ø and length are true scale — length uses FEED_DPMM, the section uses DPMM."""
+    body_h = min(dia_mm * DPMM - LINE_BLEED, band_h - 4)
+    total = length_mm * FEED_DPMM                    # collar is part of the length
+    collar_w = max(3.0, 1.0 * FEED_DPMM)             # ~1 mm lip
+    collar_h = min(dia_mm * 1.3 * DPMM - LINE_BLEED, band_h)
+    top, bot = cy - body_h / 2, cy + body_h / 2
+    d.rectangle([x0, cy - collar_h / 2, x0 + collar_w, cy + collar_h / 2], fill=BLACK)
+    sx = x0 + collar_w
+    d.rectangle([sx, top, x0 + total, bot], outline=BLACK, width=2)
+    # anti-rotation ribs biting back toward the collar, top and bottom edges
+    for x in range(int(sx) + 5, int(x0 + total) - 2, 5):
+        d.line([x, top + 1, x - 4, top + 4], fill=BLACK, width=1)
+        d.line([x, bot - 1, x - 4, bot - 4], fill=BLACK, width=1)
+    # expansion slot, open from the deep end
+    d.line([x0 + total * 0.35, cy, x0 + total - 3, cy], fill=BLACK, width=2)
+
+
 def draw_drive(d: ImageDraw.ImageDraw, cx, cy, r, kind):
     """Small screw-head top-view showing the drive type, centred at (cx, cy)."""
     kind = kind.lower()
@@ -174,6 +198,15 @@ def make_label(kind: str, m: float, length: float | None = None,
         d.text((pad, 43), "Nylon" if shape == "nylon" else "Nuts", font=f_sub, fill=BLACK)
         cx = int(W - pad - nut_half_width(m))          # right-align the nut
         draw_nut(d, cx, cy, m, nylon=(shape == "nylon"))
+    elif kind == "plug":
+        # same layout as a screw; `shape` carries an optional range prefix (SX, UX…)
+        f_big, f_sub = _font(30), _font(18)
+        title = f"{shape + ' ' if shape else ''}{m:g}x{length:g}"
+        d.text((pad, -2), title, font=f_big, fill=BLACK)
+        tw = d.textlength(title, font=f_big)
+        d.text((pad + tw + 6, 4), "Plugs", font=f_sub, fill=BLACK)
+        band_top, band_bot = 30, H - bot
+        draw_plug(d, pad, (band_top + band_bot) // 2, m, length, band_bot - band_top)
     else:
         # title + "Screws" pinned to the top; screw centred in the band below it,
         # drive-type icon in the top-right corner
@@ -202,7 +235,8 @@ def contact_sheet(specs, scale=3, out="preview.png"):
         big = im.convert("L").resize((cw, ch), Image.NEAREST).convert("RGB")
         sheet.paste(big, (gap, y))
         dd.rectangle([gap, y, gap + cw, y + ch], outline="#bbb")
-        name = f"{spec[1]} {'nut' if spec[0]=='nut' else 'x'+str(spec[2])+' screw'}  (printable {LEN_MM:g}x{HEAD_MM:g}mm @ {scale}x)"
+        what = "nut" if spec[0] == "nut" else f"x{spec[2]:g} {spec[0]}"
+        name = f"{spec[1]:g} {what}  (printable {LEN_MM:g}x{HEAD_MM:g}mm @ {scale}x)"
         dd.text((gap, y + ch + 2), name, font=f, fill="black")
         y += ch + cap_h + gap
     sheet.save(out)
@@ -211,16 +245,23 @@ def contact_sheet(specs, scale=3, out="preview.png"):
 
 def parse_spec(token: str):
     """'M5' -> nut; 'M5:nylon' -> nyloc nut; 'M5x30:pan:philips' -> screw with
-    head profile + drive icon. Tags after the size (any order): for screws a head
+    head profile + drive icon; 'SX6x30:plug' -> wall plug (any letter prefix is
+    kept as the range name). Tags after the size (any order): for screws a head
     shape (pan/csk/hex) and/or drive (philips/pozi/torx/slot/square/allen); for
-    nuts a variant (nylon)."""
+    nuts a variant (nylon); 'plug' switches the whole label to a wall plug."""
     parts = token.split(":")
-    t = parts[0].strip().upper().lstrip("M")
+    tags = [t.strip().lower() for t in parts[1:]]
+    t = parts[0].strip().upper()
+    prefix = t[:len(t) - len(t.lstrip(ascii_uppercase))]   # 'M', 'SX', '' …
+    t = t[len(prefix):]
+    if any(tag in PLUG_TYPES for tag in tags):
+        dia, length = t.split("X", 1)
+        return ("plug", float(dia), float(length),
+                "" if prefix == "M" else prefix, None)
     is_screw = "X" in t
     shape = "hex" if is_screw else None
     drive = None
-    for tag in parts[1:]:
-        tag = tag.strip().lower()
+    for tag in tags:
         if is_screw and tag in HEAD_SHAPES:
             shape = HEAD_SHAPES[tag]
         elif is_screw and tag in DRIVES:
@@ -237,6 +278,8 @@ def spec_name(spec) -> str:
     kind, m, length, shape, drive = spec
     if kind == "nut":
         return f"M{m:g}_nut" + (f"_{shape}" if shape else "")
+    if kind == "plug":
+        return f"{shape + '_' if shape else ''}{m:g}x{length:g}_plug"
     tags = "".join(f"_{t}" for t in (shape if shape != "hex" else None, drive) if t)
     return f"M{m:g}x{length:g}_screw{tags}"
 
@@ -265,6 +308,9 @@ def main(argv=None):
         if kind == "nut":
             variant = " nyloc" if shape == "nylon" else ""
             print(f"  {os.path.basename(path):24} M{m:g}{variant} nut: hex WAF {WAF[m]} mm, hole Ø{m:g} mm")
+        elif kind == "plug":
+            print(f"  {os.path.basename(path):24} {shape + ' ' if shape else ''}"
+                  f"{m:g}x{length:g}: wall plug, Ø{m:g}x{length:g} mm")
         else:
             s, k = HEX_BOLT[m]
             extra = "".join(f", {t}" for t in (shape if shape != 'hex' else None,
