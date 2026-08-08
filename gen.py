@@ -15,11 +15,12 @@ DPMM = 8
 W, H = 280, 90                           # length x head, in dots
 BLACK, WHITE = 0, 1
 
-# The head prints at 8 dot/mm, but the S001's paper-advance (length) pitch runs
-# long — an 8 mm feature measured ~9.5 mm. So the head axis uses DPMM and the
-# LENGTH axis uses FEED_DPMM; fasteners are drawn at their true *printed* size and
-# the unused length stays white. Set FEED_CAL = 1.0 for a printer with matched feed.
-FEED_CAL = 8.0 / 9.5
+# Length-axis (paper advance) pitch relative to the head's 8 dot/mm. Measured on
+# an S001 by printing a nut and measuring its hole, which is drawn as a true
+# circle: 9.8 mm across the head axis vs 8.4 mm along the feed — i.e. the feed
+# also runs at ~8 dot/mm and needs no correction. Lower this if your printer
+# feeds long (a feature comes out longer than drawn), raise it if it feeds short.
+FEED_CAL = 1.0
 FEED_DPMM = DPMM * FEED_CAL               # dots per mm along the label length
 LEN_MM, HEAD_MM = W / FEED_DPMM, H / DPMM  # ~41.5 x 11.25 mm printable
 

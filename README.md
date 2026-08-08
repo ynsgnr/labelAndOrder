@@ -23,11 +23,11 @@ on an Orgstra **S001** (Xinye) label printer via
 - **`print.py`** — prints a folder of stickers on the S001 through the TiMini CLI:
   one test sticker, you approve, then it prints the rest.
 
-The head axis prints at **8 dot/mm**; the S001's paper-advance runs long, so the
-generator draws the length axis at a calibrated pitch (`FEED_CAL`, from an 8 mm
-feature measuring ~9.5 mm) — fasteners come out **true size** and the unused
-length is left white. Set `FEED_CAL = 1.0` in `gen.py` for a printer whose feed
-already matches the head.
+Both axes print at **8 dot/mm** on the S001, so `FEED_CAL = 1.0`. If your printer's
+paper advance doesn't match its head, print a nut and measure the hole — it's drawn
+as a true circle, so any difference between its two diameters is the feed error.
+Set `FEED_CAL` in `gen.py` to (feed diameter ÷ head diameter) and the length axis
+is redrawn to compensate; the unused label length stays white.
 
 ## Install
 
@@ -107,10 +107,11 @@ README for pairing).
 
 The identifying dimensions — **shaft Ø × length** — print true size; the head is a
 visual cue (drawn ISO hex-bolt size, ~5.5 mm across for M3, and varies in reality
-by head type). The printable head axis is **11.25 mm** (the S001 head is 12 mm but
-the protocol reserves 6 dots), so a nut wider than that clips top/bottom —
-intentional. Keep the `tag_90r_90p` preset and, on a new printer, measure your
-first sticker and tune `FEED_CAL` in `gen.py` if the length is off.
+by head type). The printable area is **35 × 11.25 mm** (the S001 head is 12 mm but
+the protocol reserves 6 dots; the label's first ~5 mm is a dead zone), so a nut
+wider than 11.25 mm or a screw longer than ~33 mm runs off the edge — intentional.
+Keep the `tag_90r_90p` preset and, on a new printer, measure your first sticker and
+tune `FEED_CAL` in `gen.py` if the length is off.
 
 ## Requirements
 
