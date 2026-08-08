@@ -37,6 +37,9 @@ DRIVES = ["philips", "allen", "torx"]        # the drives people actually meet
 PLUGS = [("SX", 5, 25), ("SX", 6, 30), ("SX", 6, 40),
          ("SX", 8, 40), ("SX", 8, 50), ("SX", 10, 50)]
 
+# Plain captions. Generate your own with: gen.py "text:Washers"
+TEXTS = ["Misc"]
+
 
 def specs() -> list[tuple]:
     out = [("nut", m, None, variant, None)
@@ -47,6 +50,7 @@ def specs() -> list[tuple]:
             for shape in HEAD_SHAPES
             for drive in DRIVES]
     out += [("plug", dia, length, prefix, None) for prefix, dia, length in PLUGS]
+    out += [("text", 0, None, caption, None) for caption in TEXTS]
     return out
 
 

@@ -18,7 +18,7 @@ on an Orgstra **S001** (Xinye) label printer via
 ## Just print them
 
 The whole catalogue is **pre-generated and committed** — clone and print, no Python
-needed. One folder per label template, 674 stickers each:
+needed. One folder per label template, 675 stickers each:
 
 | Folder | Label | Dots | Printers |
 |---|---|---|---|
@@ -30,6 +30,7 @@ needed. One folder per label template, 674 stickers each:
 s001-12x40mm/m4x20-screw-pan-philips.png
 label-40x30mm/m5-nut-nylon.png
 label-50x30mm/sx-6x30-plug.png
+s001-12x40mm/misc-text.png
 ```
 
 Each folder has a `preview.png` contact sheet of the same examples shown above.
@@ -80,6 +81,8 @@ uv run gen.py M3 M5 M8 M5x50 M4x20 --out out --sheet
 - `M5` → nut, `M5x50` → screw (Ø5 × 50 mm). Decimals are fine: `M2.5`.
 - `SX6x30:plug` → wall plug (Ø6 × 30 mm). Plugs aren't threaded, so the size
   needs no `M`; any letter prefix is kept as the range name (`SX 6x30`).
+- `"text:Misc"` → a plain caption, for the drawer that defies classification.
+  Written verbatim and shrunk to fit, so `"text:Anchors & Plugs"` works too.
 - PNGs are written to `out/` (`M5_nut.png`, `M5x50_screw.png`, `SX_6x30_plug.png`).
 - `--sheet` also writes `_preview.png` so you can eyeball the batch.
 - `--template label-40x30mm` draws for a different label (default is the S001).

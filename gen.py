@@ -246,6 +246,18 @@ def draw_drive(d: ImageDraw.ImageDraw, cx, cy, r, kind):
 
 # ----------------------------------------------------------------- layout ----
 
+def _fit_font(d: ImageDraw.ImageDraw, text: str, max_w: int, size_mm=5.0):
+    """Largest font at or below `size_mm` tall that keeps `text` inside max_w."""
+    size = mm(size_mm)
+    floor = mm(2.0)
+    while size > floor:
+        font = _font(size)
+        if d.textlength(text, font=font) <= max_w:
+            return font
+        size -= 1
+    return _font(floor)
+
+
 def _title_row(d: ImageDraw.ImageDraw, title: str, caption: str):
     """Big size followed by a small caption, pinned to the top-left."""
     f_big, f_sub = _font(mm(3.75)), _font(mm(2.25))
@@ -258,6 +270,14 @@ def make_label(kind: str, m: float, length: float | None = None,
                shape: str = "hex", drive: str | None = None) -> Image.Image:
     img = Image.new("1", (W, H), WHITE)
     d = ImageDraw.Draw(img)
+
+    if kind == "text":
+        # a plain caption: same style as the nut title, centred since nothing
+        # sits under it. Shrinks to fit rather than running off the label.
+        font = _fit_font(d, shape, W - 2 * PAD)
+        top, bottom = d.textbbox((0, 0), shape, font=font)[1::2]
+        d.text((PAD, (H - (top + bottom)) // 2), shape, font=font, fill=BLACK)
+        return img
 
     if kind == "nut":
         # size and variant stacked tight on the left, hex face on the right
@@ -293,9 +313,14 @@ def contact_sheet(specs, scale=3, out="preview.png"):
         big = make_label(*spec).convert("L").resize((cw, ch), Image.NEAREST).convert("RGB")
         sheet.paste(big, (gap, y))
         dd.rectangle([gap, y, gap + cw, y + ch], outline="#bbb")
-        what = "nut" if spec[0] == "nut" else f"x{spec[2]:g} {spec[0]}"
+        if spec[0] == "text":
+            what = f"{spec[3]!r} text"
+        elif spec[0] == "nut":
+            what = f"{spec[1]:g} nut"
+        else:
+            what = f"{spec[1]:g}x{spec[2]:g} {spec[0]}"
         dd.text((gap, y + ch + 2),
-                f"{spec[1]:g} {what}  (printable {LEN_MM:g}x{HEAD_MM:g}mm @ {scale}x)",
+                f"{what}  (printable {LEN_MM:.1f}x{HEAD_MM:.1f}mm @ {scale}x)",
                 font=f, fill="black")
     sheet.save(out)
     return out
@@ -313,7 +338,12 @@ def parse_spec(token: str):
         M5x30              screw
         M5x30:pan:philips  screw with a head profile and drive icon
         SX6x30:plug        wall plug, the letter prefix kept as the range name
+        text:Misc          a plain caption, kept verbatim
     """
+    head, sep, rest = token.partition(":")
+    if head.strip().lower() == "text":
+        return ("text", 0, None, rest.strip() or "Label", None)
+
     size, *tags = token.split(":")
     tags = [t.strip().lower() for t in tags]
     size = size.strip().upper()
@@ -337,6 +367,9 @@ def parse_spec(token: str):
 def spec_name(spec) -> str:
     """Output filename stem: lowercase, dash-separated. m4x20-screw-pan-philips"""
     kind, m, length, shape, drive = spec
+    if kind == "text":
+        slug = "".join(c if c.isalnum() else "-" for c in shape).strip("-")
+        return f"{slug}-text".lower()
     if kind == "nut":
         parts = [f"m{m:g}", "nut", shape]
     elif kind == "plug":
@@ -350,6 +383,8 @@ def spec_name(spec) -> str:
 def describe(spec) -> str:
     """One-line summary of what a spec draws, for the console readout."""
     kind, m, length, shape, drive = spec
+    if kind == "text":
+        return f"text label: {shape!r}"
     if kind == "nut":
         variant = " nyloc" if shape == "nylon" else ""
         return f"M{m:g}{variant} nut: hex WAF {nut_waf(m):g} mm, hole Ø{m:g} mm"
