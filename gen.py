@@ -74,13 +74,19 @@ def _hex_points(cx, cy, waf_mm):
     ]
 
 
-NUT_SHRINK_MM = 1.0   # draw the hex 1 mm under WAF so the thin line traces the nut edge
+# Nudge every nut's width across flats, mm. 0 = true ISO size. This used to be a
+# flat -1 mm "shrink", which stacked on top of the LINE_BLEED compensation below
+# and left every nut ~0.6 mm narrow — most of a size step at M2-M4.
+NUT_BIAS_MM = 0.0
 NUT_CENTRE_FRAC = 1 / 3   # nut centre sits this fraction of the length in from the right
 
 def draw_nut(d: ImageDraw.ImageDraw, cx, cy, m, nylon=False):
-    waf = WAF.get(m, m * 1.6) - NUT_SHRINK_MM
-    d.polygon(_hex_points(cx, cy, waf), outline=BLACK, width=2)
-    rx, ry = (m / 2) * FEED_DPMM, (m / 2) * DPMM     # hole (round when printed)
+    # The hex outline is an OUTER edge (bleed grows it), the hole an INNER one
+    # (bleed closes it in), so they're compensated in opposite directions.
+    waf = WAF.get(m, m * 1.6) + NUT_BIAS_MM
+    d.polygon(_hex_points(cx, cy, waf - LINE_BLEED / DPMM), outline=BLACK, width=2)
+    rx = (m / 2) * FEED_DPMM + LINE_BLEED / 2
+    ry = (m / 2) * DPMM + LINE_BLEED / 2
     d.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], outline=BLACK, width=2)
     if nylon:
         # nyloc insert: a dotted ring (reads 'grey' on B/W) between hole and hex
