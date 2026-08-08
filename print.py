@@ -1,28 +1,22 @@
 """Print a folder of sticker PNGs on the Orgstra S001 via the TiMini CLI.
 
-Depends on TiMini-Print (the S001 label-printer driver):
-    https://github.com/ynsgnr/TiMini-Print
-Point --timini (or the TIMINI_DIR env var) at your local TiMini-Print checkout.
+Needs a checkout of TiMini-Print, the S001 driver, pointed at by --timini or the
+TIMINI_DIR env var: https://github.com/ynsgnr/TiMini-Print
 
-Waits for Enter before EACH sticker, so you can check the last one and reposition
-the roll instead of the printer running the whole batch non-stop.
+Nothing prints until you ask for it, so you can check the last label and
+reposition the roll between stickers:
 
-    py print.py out                           # Enter prints the next one
-    py print.py out --count 2                 # 2 copies of every sticker
-    py print.py out --yes                     # print everything, no prompts
-    py print.py out --test                    # print only the first, then stop
-    py print.py out --rest                    # skip the first, prompt for the rest
-    py print.py out --serial COM5 --paper tag_90r_90p --timini ../TiMini-Print
+    py print.py out                    # Enter prints the next one
+    py print.py out --count 2          # 2 copies of every sticker
+    py print.py out --yes              # print everything, no prompts
+    py print.py out --test             # print only the first, then stop
+    py print.py out --rest             # skip the first, prompt for the rest
 
-At each prompt: Enter = print --count copies, a number = that many copies of this
-one, s = skip it, q = stop.
+At each prompt: Enter prints --count copies, a number prints that many copies of
+just that sticker, 's' skips it, 'q' stops.
 
-The S001 closes its SPP port after each job and needs a moment before it will
-accept the next one, so consecutive prints are spaced by --delay seconds. A job
-that still fails is offered for retry instead of aborting the batch.
-
-The generator already draws stickers at the S001's true printed size (including the
-paper-advance/length calibration), so this just streams each PNG to TiMini as-is.
+gen.py already draws stickers at the S001's true printed size, so each PNG is
+streamed to TiMini as-is.
 """
 from __future__ import annotations
 import argparse
@@ -31,44 +25,76 @@ import os
 import subprocess
 import sys
 import time
+from dataclasses import dataclass, field
 
 
 class Stop(Exception):
-    """User asked to stop the batch."""
+    """Abandon the batch — the user asked, or a job failed unattended."""
 
 
-def send(png, serial, model, paper, timini_dir) -> bool:
-    """Run one TiMini job. Returns True if it printed."""
-    # TiMini runs with cwd in its own checkout, so pass an absolute sticker path.
-    cmd = [sys.executable, "-m", "timiniprint", "--serial", serial,
-           "--printer-model", model, "--paper", paper, os.path.abspath(png)]
-    return subprocess.run(cmd, cwd=timini_dir).returncode == 0
+@dataclass
+class Printer:
+    """One S001 on a serial port, printing PNGs through the TiMini CLI.
+
+    The printer closes its SPP port at the end of a job and needs a moment before
+    it will accept another, so jobs are spaced by `delay` seconds.
+    """
+    serial: str
+    model: str
+    paper: str
+    timini: str
+    delay: float = 2.0
+    _last_job: float = field(default=0.0, repr=False)
+
+    def send(self, png: str) -> bool:
+        """Run one TiMini job, waiting out the gap first. True if it printed."""
+        idle = self.delay - (time.monotonic() - self._last_job)
+        if idle > 0:
+            time.sleep(idle)
+        # TiMini runs with cwd in its own checkout, so pass an absolute path.
+        cmd = [sys.executable, "-m", "timiniprint", "--serial", self.serial,
+               "--printer-model", self.model, "--paper", self.paper,
+               os.path.abspath(png)]
+        try:
+            return subprocess.run(cmd, cwd=self.timini).returncode == 0
+        finally:
+            self._last_job = time.monotonic()
+
+    def copies(self, png: str, count: int, interactive: bool = True) -> None:
+        """Print `count` copies. A failed job is offered for retry rather than
+        losing the rest of the batch."""
+        name = os.path.basename(png)
+        done = 0
+        while done < count:
+            print(f"  -> {name}" + (f"  (copy {done + 1}/{count})" if count > 1 else ""))
+            if self.send(png):
+                done += 1
+                continue
+            print(f"  !! {name} failed to print — printer asleep or COM port dropped.")
+            if not interactive:
+                raise Stop(f"{name} failed (non-interactive)")
+            answer = input("     [Enter] retry · 's' skip this copy · 'q' stop > ")
+            answer = answer.strip().lower()
+            if answer == "q":
+                raise Stop(f"{name} failed")
+            if answer == "s":
+                done += 1
 
 
-def print_one(png, serial, model, paper, timini_dir, count=1, delay=2.0,
-              interactive=True) -> None:
-    """Print `count` copies, spacing jobs by `delay` s so the S001's SPP port has
-    time to come back. A failed job can be retried rather than losing the batch."""
-    name = os.path.basename(png)
-    n = 1
-    first = True
-    while n <= count:
-        if not first:
-            time.sleep(delay)          # let the printer release/reopen the port
-        first = False
-        suffix = f"  (copy {n}/{count})" if count > 1 else ""
-        print(f"  -> {name}{suffix}")
-        if send(png, serial, model, paper, timini_dir):
-            n += 1
-            continue
-        print(f"  !! {name} failed to print — printer asleep or COM port dropped.")
-        if not interactive:
-            raise Stop(f"{name} failed (non-interactive)")
-        ans = input("     [Enter] retry · 's' skip this copy · 'q' stop > ").strip().lower()
-        if ans == "q":
-            raise Stop(f"{name} failed")
-        if ans == "s":
-            n += 1
+def prompt_each(printer: Printer, pngs: list[str], count: int) -> None:
+    """Walk the batch, printing only what's asked for at each prompt."""
+    total = len(pngs)
+    print(f"{total} stickers{f' x{count}' if count > 1 else ''} — Enter prints the "
+          f"next, a number prints that many copies, 's' skips it, 'q' stops.")
+    for i, png in enumerate(pngs, 1):
+        answer = input(f"[{i}/{total}] {os.path.basename(png)} > ").strip().lower()
+        if answer == "q":
+            print(f"stopped at {i} of {total}.")
+            return
+        wanted = int(answer) if answer.isdigit() else (0 if answer == "s" else count)
+        if wanted > 0:
+            printer.copies(png, wanted)
+    print(f"done ({total} stickers).")
 
 
 def main(argv=None):
@@ -80,70 +106,43 @@ def main(argv=None):
     p.add_argument("--count", type=int, default=1, metavar="N",
                    help="copies of each sticker (default: 1)")
     p.add_argument("--delay", type=float, default=2.0, metavar="S",
-                   help="seconds between consecutive jobs so the S001's SPP port "
-                        "comes back (default: 2)")
+                   help="seconds between jobs, so the S001's SPP port comes back "
+                        "(default: 2)")
     p.add_argument("--timini", default=os.environ.get("TIMINI_DIR"),
                    help="path to a TiMini-Print checkout (or set TIMINI_DIR); "
                         "https://github.com/ynsgnr/TiMini-Print")
-    g = p.add_mutually_exclusive_group()
-    g.add_argument("--yes", action="store_true", help="print all without prompting")
-    g.add_argument("--test", action="store_true", help="print only the first, then stop")
-    g.add_argument("--rest", action="store_true", help="skip the first, prompt for the rest")
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--yes", action="store_true", help="print all without prompting")
+    mode.add_argument("--test", action="store_true", help="print only the first, then stop")
+    mode.add_argument("--rest", action="store_true", help="skip the first, prompt for the rest")
     args = p.parse_args(argv)
 
     if not args.timini or not os.path.isdir(args.timini):
         sys.exit("set --timini <path> or TIMINI_DIR to your TiMini-Print checkout "
                  "(https://github.com/ynsgnr/TiMini-Print)")
-
-    pngs = sorted(glob.glob(os.path.join(args.folder, "*.png")))
-    pngs = [p for p in pngs if not os.path.basename(p).startswith("_")]  # skip _preview.png
-    if not pngs:
-        sys.exit(f"no .png stickers in {args.folder!r}")
-
     if args.count < 1:
         sys.exit("--count must be 1 or more")
 
-    def emit(png, count, interactive=True, space=False):
-        if space:
-            time.sleep(args.delay)
-        print_one(png, args.serial, args.model, args.paper, args.timini,
-                  count, args.delay, interactive)
+    pngs = sorted(glob.glob(os.path.join(args.folder, "*.png")))
+    pngs = [f for f in pngs if not os.path.basename(f).startswith("_")]  # skip _preview
+    if not pngs:
+        sys.exit(f"no .png stickers in {args.folder!r}")
 
+    printer = Printer(args.serial, args.model, args.paper, args.timini, args.delay)
     each = f" x{args.count}" if args.count > 1 else ""
     try:
         if args.test:
             print(f"test print (1 of {len(pngs)}){each}:")
-            emit(pngs[0], args.count)
-            return
-        if args.yes:
+            printer.copies(pngs[0], args.count)
+        elif args.yes:
             print(f"printing all {len(pngs)}{each}:")
-            for i, png in enumerate(pngs):
-                emit(png, args.count, interactive=False, space=i > 0)
-            return
-        if args.rest:
-            pngs = pngs[1:]
-
-        # one at a time: nothing prints until you press Enter for it
-        print(f"{len(pngs)} stickers{each} — Enter prints the next, a number prints that "
-              f"many copies, 's' skips it, 'q' stops.")
-        total = len(pngs)
-        for i, png in enumerate(pngs, 1):
-            ans = input(f"[{i}/{total}] {os.path.basename(png)} > ").strip().lower()
-            if ans == "q":
-                print(f"stopped at {i} of {total}.")
-                return
-            if ans == "s":
-                continue
-            count = args.count
-            if ans.isdigit():
-                count = int(ans)
-                if count < 1:
-                    continue          # '0' -> skip
-            emit(png, count)
-        print(f"done ({total} stickers).")
+            for png in pngs:
+                printer.copies(png, args.count, interactive=False)
+        else:
+            prompt_each(printer, pngs[1:] if args.rest else pngs, args.count)
     except Stop as e:
-        sys.exit(f"stopped: {e}. Check the printer is awake, then rerun "
-                 f"(the folder is safe to re-run — skip what already printed).")
+        sys.exit(f"stopped: {e}. Check the printer is awake, then rerun — the folder "
+                 f"is safe to re-run, just skip what already printed.")
 
 
 if __name__ == "__main__":
