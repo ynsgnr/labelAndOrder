@@ -15,12 +15,33 @@ on an Orgstra **S001** (Xinye) label printer via
 > no calibration constants to tune. The layout and font sizes are eyeballed for a
 > 90-dot-tall label, so a very different label shape would want those adjusted too.
 
+## Just print them
+
+The whole catalogue is **pre-generated and committed** — clone and print, no Python
+needed. One folder per label template, 674 stickers each:
+
+| Folder | Label | Dots | Printers |
+|---|---|---|---|
+| `s001-12x40mm/` | 12 × 40 mm | 280 × 90 @ 203 dpi | Orgstra S001 / Xinye |
+| `label-40x30mm/` | 40 × 30 mm | 320 × 240 @ 203 dpi | Phomemo M110 class and friends |
+| `label-50x30mm/` | 50 × 30 mm | 384 × 240 @ 203 dpi | same, 48 mm printable |
+
+```
+s001-12x40mm/m4x20-screw-pan-philips.png
+label-40x30mm/m5-nut-nylon.png
+label-50x30mm/sx-6x30-plug.png
+```
+
+Each folder has a `preview.png` contact sheet of the same examples shown above.
+Rebuild the lot with `uv run build_catalog.py --clean`.
+
 ## What it does
 
 - **`gen.py`** — generates one PNG per size. Nuts are drawn by ISO hex
   width-across-flats, screws and wall plugs by real Ø × length. Optional head
   shapes, drive icons, a nyloc variant and a plug kind. Anything larger than the
-  label runs off the edge and gets cut — by design.
+  label runs off the edge and gets cut — by design. `--template` picks the label.
+- **`build_catalog.py`** — regenerates every folder above.
 - **`print.py`** — prints a folder of stickers on the S001 through the TiMini CLI,
   one at a time, waiting for you between each.
 
@@ -61,6 +82,7 @@ uv run gen.py M3 M5 M8 M5x50 M4x20 --out out --sheet
   needs no `M`; any letter prefix is kept as the range name (`SX 6x30`).
 - PNGs are written to `out/` (`M5_nut.png`, `M5x50_screw.png`, `SX_6x30_plug.png`).
 - `--sheet` also writes `_preview.png` so you can eyeball the batch.
+- `--template label-40x30mm` draws for a different label (default is the S001).
 
 **Tags** — add `:tag` after the size (any order) to vary the drawing:
 
@@ -82,7 +104,7 @@ S001 label-printer driver. Clone it, then point `--timini` (or the `TIMINI_DIR`
 env var) at your checkout:
 
 ```
-uv run print.py out --serial COM5 --timini ../TiMini-Print
+uv run print.py s001-12x40mm --serial COM5 --timini ../TiMini-Print
 ```
 
 - Prompts before **each** sticker: Enter prints it, a number prints that many

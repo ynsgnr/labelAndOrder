@@ -10,25 +10,76 @@ Anything bigger than the label runs off the edge and is cut, by design.
 """
 from __future__ import annotations
 import math
+from dataclasses import dataclass
 from string import ascii_uppercase
 from PIL import Image, ImageDraw, ImageFont
 
 # ---------------------------------------------------------------- geometry ---
-# The only printer-specific values. For the Orgstra S001: a 203 dpi head, and a
-# 12 x 40 mm label whose printable area is 280 x 90 dots — the head is 96 dots but
-# the protocol reserves a 6-dot pad, and the label's first ~5 mm is a feed dead
-# zone. Both are in TiMini's printer_models / printer_paper_presets data.
+# A label is fully described by its printable size in dots and its head
+# resolution — both of which TiMini knows per model. Everything else is drawn in
+# millimetres and converted, so the same code is correct at any resolution.
 
-DPMM = 8                                 # print head resolution, dots per mm
-W, H = 280, 90                           # printable label, length x head, in dots
 BLACK, WHITE = 0, 1
 
-LEN_MM, HEAD_MM = W / DPMM, H / DPMM     # 35 x 11.25 mm printable
 
-# Layout, in dots. Tuned by eye for a 90-dot-tall label; a very different label
-# would want these and the font sizes adjusted to suit.
-PAD = 2 * DPMM        # left/right margin
-BAND_TOP = 30         # top of the drawing band, below the title row
+@dataclass(frozen=True)
+class Template:
+    """A printable label area. `w`/`h` are dots; the drawing is isotropic, so
+    which axis is the head and which the feed only matters to the printer."""
+    key: str
+    w: int
+    h: int
+    dpi: int = 203
+    note: str = ""
+
+    @property
+    def dpmm(self) -> float:
+        return self.dpi / 25.4
+
+    @property
+    def size_mm(self) -> tuple[float, float]:
+        return self.w / self.dpmm, self.h / self.dpmm
+
+
+# Orgstra S001: 12 x 40 mm label. The head is 96 dots but the protocol reserves a
+# 6-dot pad, and the label's first ~5 mm is a feed dead zone, so 280 x 90 is
+# printable. TiMini rotates it, so here the long axis is the image width.
+S001 = Template("s001-12x40mm", 280, 90, 203, "Orgstra S001 / Xinye label")
+
+# The common gap-label sizes for 384-dot 203 dpi heads (Phomemo M110 class and
+# friends) — 48 mm printable, so a 50 mm label is clipped to 384 dots.
+TEMPLATES = {
+    t.key: t for t in (
+        S001,
+        Template("label-40x30mm", 320, 240, 203, "40 x 30 mm gap label"),
+        Template("label-50x30mm", 384, 240, 203, "50 x 30 mm gap label (48 mm printable)"),
+    )
+}
+
+# The template currently being drawn. Module-level so the drawing helpers stay
+# small; use_template() rebinds it and the derived dot values.
+TEMPLATE = S001
+DPMM = TEMPLATE.dpmm
+W, H = TEMPLATE.w, TEMPLATE.h
+LEN_MM, HEAD_MM = TEMPLATE.size_mm
+
+
+def mm(value: float) -> int:
+    """Millimetres to whole dots."""
+    return round(value * DPMM)
+
+
+def use_template(template: Template) -> None:
+    global TEMPLATE, DPMM, W, H, LEN_MM, HEAD_MM, PAD, BAND_TOP
+    TEMPLATE, DPMM = template, template.dpmm
+    W, H = template.w, template.h
+    LEN_MM, HEAD_MM = template.size_mm
+    PAD, BAND_TOP = mm(2.0), mm(3.75)
+
+
+# Layout, in millimetres, so it holds at any resolution.
+PAD = mm(2.0)          # left/right margin
+BAND_TOP = mm(3.75)    # top of the drawing band, below the title row
 NUT_CENTRE_FRAC = 1 / 3   # nut centre sits this far in from the right edge, as a
                           # fraction of the length: right-aligning put small nuts
                           # on the label's rounded corner
@@ -197,9 +248,10 @@ def draw_drive(d: ImageDraw.ImageDraw, cx, cy, r, kind):
 
 def _title_row(d: ImageDraw.ImageDraw, title: str, caption: str):
     """Big size followed by a small caption, pinned to the top-left."""
-    f_big, f_sub = _font(30), _font(18)
-    d.text((PAD, -2), title, font=f_big, fill=BLACK)
-    d.text((PAD + d.textlength(title, font=f_big) + 6, 4), caption, font=f_sub, fill=BLACK)
+    f_big, f_sub = _font(mm(3.75)), _font(mm(2.25))
+    d.text((PAD, -mm(0.25)), title, font=f_big, fill=BLACK)
+    d.text((PAD + d.textlength(title, font=f_big) + mm(0.75), mm(0.5)),
+           caption, font=f_sub, fill=BLACK)
 
 
 def make_label(kind: str, m: float, length: float | None = None,
@@ -209,9 +261,9 @@ def make_label(kind: str, m: float, length: float | None = None,
 
     if kind == "nut":
         # size and variant stacked tight on the left, hex face on the right
-        d.text((PAD, 1), f"M{m:g}", font=_font(40), fill=BLACK)
-        d.text((PAD, 43), "Nylon" if shape == "nylon" else "Nuts",
-               font=_font(20), fill=BLACK)
+        d.text((PAD, mm(0.125)), f"M{m:g}", font=_font(mm(5.0)), fill=BLACK)
+        d.text((PAD, mm(5.375)), "Nylon" if shape == "nylon" else "Nuts",
+               font=_font(mm(2.5)), fill=BLACK)
         draw_nut(d, int(W - NUT_CENTRE_FRAC * W), H // 2, m, nylon=(shape == "nylon"))
         return img
 
@@ -223,7 +275,8 @@ def make_label(kind: str, m: float, length: float | None = None,
     else:
         _title_row(d, f"M{m:g}x{length:g}", "Screws")
         if drive:
-            draw_drive(d, W - PAD - 13, 15, 13, drive)     # top-right corner
+            r = mm(1.625)
+            draw_drive(d, W - PAD - r, mm(1.875), r, drive)   # top-right corner
         draw_screw(d, PAD, band_cy, m, length, band_h, shape)
     return img
 
@@ -282,14 +335,16 @@ def parse_spec(token: str):
 
 
 def spec_name(spec) -> str:
-    """Output filename stem for a spec."""
+    """Output filename stem: lowercase, dash-separated. m4x20-screw-pan-philips"""
     kind, m, length, shape, drive = spec
     if kind == "nut":
-        return f"M{m:g}_nut" + (f"_{shape}" if shape else "")
-    if kind == "plug":
-        return f"{shape + '_' if shape else ''}{m:g}x{length:g}_plug"
-    tags = "".join(f"_{t}" for t in (shape if shape != "hex" else None, drive) if t)
-    return f"M{m:g}x{length:g}_screw{tags}"
+        parts = [f"m{m:g}", "nut", shape]
+    elif kind == "plug":
+        parts = [shape, f"{m:g}x{length:g}", "plug"]
+    else:
+        parts = [f"m{m:g}x{length:g}", "screw",
+                 shape if shape != "hex" else None, drive]
+    return "-".join(p for p in parts if p).lower()
 
 
 def describe(spec) -> str:
@@ -317,14 +372,17 @@ def main(argv=None):
                    help="e.g. M3 M5 M8 M5x50 M4x20  (Mx = nut, MxL = screw)")
     p.add_argument("--out", default="out", help="output folder (default: ./out)")
     p.add_argument("--sheet", action="store_true", help="also write a _preview.png contact sheet")
+    p.add_argument("--template", default=S001.key, choices=sorted(TEMPLATES),
+                   help=f"label template (default: {S001.key})")
     args = p.parse_args(argv)
+    use_template(TEMPLATES[args.template])
 
     tokens = args.sizes or ["M3", "M5", "M5:nylon", "M4x20:pan:philips",
                             "M4x20:csk:pozi", "M5x30:hex"]
     specs = [parse_spec(t) for t in tokens]
     os.makedirs(args.out, exist_ok=True)
-    print(f"scale = {DPMM} dot/mm; printable {LEN_MM:g}x{HEAD_MM:g} mm = "
-          f"{W}x{H} dots (1 px = 1 dot)")
+    print(f"{TEMPLATE.key}: {TEMPLATE.dpi} dpi = {DPMM:.3f} dot/mm; "
+          f"{LEN_MM:.1f}x{HEAD_MM:.1f} mm = {W}x{H} dots (1 px = 1 dot)")
     for spec in specs:
         name = spec_name(spec) + ".png"
         make_label(*spec).save(os.path.join(args.out, name))

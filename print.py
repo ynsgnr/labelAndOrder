@@ -129,7 +129,10 @@ def main(argv=None):
         sys.exit("--count must be 1 or more")
 
     pngs = sorted(glob.glob(os.path.join(args.folder, "*.png")))
-    pngs = [f for f in pngs if not os.path.basename(f).startswith("_")]  # skip _preview
+    # contact sheets are for looking at, not printing
+    pngs = [f for f in pngs
+            if not os.path.basename(f).startswith("_")
+            and os.path.basename(f) != "preview.png"]
     if not pngs:
         sys.exit(f"no .png stickers in {args.folder!r}")
 
