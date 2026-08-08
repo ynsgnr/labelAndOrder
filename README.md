@@ -9,10 +9,11 @@ on an Orgstra **S001** (Xinye) label printer via
 
 ![examples](examples/preview.png)
 
-> **Note:** the sizing (dot pitch, feed calibration, bleed compensation, printable
-> area) is tuned for the **Orgstra S001**. On other printers the fasteners may come
-> out slightly off — adjust `FEED_CAL`, `DPMM`, `LINE_BLEED`, and the `W`/`H`
-> printable size at the top of `gen.py`, and measure your first sticker.
+> **Other printers:** the only printer-specific values are the head resolution
+> (`DPMM`) and the printable area (`W`, `H`) at the top of `gen.py` — both of which
+> TiMini already knows per model. Set those and the drawings are correct; there are
+> no calibration constants to tune. The layout and font sizes are eyeballed for a
+> 90-dot-tall label, so a very different label shape would want those adjusted too.
 
 ## What it does
 
@@ -20,18 +21,18 @@ on an Orgstra **S001** (Xinye) label printer via
   width-across-flats, screws and wall plugs by real Ø × length. Optional head
   shapes, drive icons, a nyloc variant and a plug kind. Anything larger than the
   label runs off the edge and gets cut — by design.
-- **`print.py`** — prints a folder of stickers on the S001 through the TiMini CLI:
-  one test sticker, you approve, then it prints the rest.
+- **`print.py`** — prints a folder of stickers on the S001 through the TiMini CLI,
+  one at a time, waiting for you between each.
 
-The head axis prints at **8 dot/mm**; the S001's paper advance runs slightly long
-(~7.6 dot/mm), so the generator draws the length axis at `FEED_CAL × 8` and leaves
-the unused label length white. Printed edges also bleed about `LINE_BLEED` (0.375 mm),
-which grows outer dimensions and shrinks inner ones, so both are compensated.
+Both axes print at **8 dot/mm**, so a sticker is drawn 1 px per dot at nominal ISO
+size and the unused label length is left white. No scaling, no fudge factors — if a
+print measures wrong, something upstream is rescaling it:
 
-To calibrate a different printer: print a screw, measure the shaft from the head
-underside to the tip, and set
-
-    FEED_CAL = nominal_mm / (measured_mm - LINE_BLEED / DPMM)
+> **Margin trimming must be off.** TiMini trims white margins by default and scales
+> what's left to fill the label — a different factor for every sticker, since each
+> has a different amount of white. That silently destroys true-size printing.
+> `print.py` passes `--no-trim-side-margins --no-trim-top-bottom-margins`; if you
+> print these PNGs by any other route, pass them yourself.
 
 ## Install
 
@@ -103,25 +104,24 @@ README for pairing).
 
 | Item | Standard |
 |------|----------|
-| Nut hex width-across-flats | ISO 4032 (M3 = 5.5, M4 = 7, M5 = 8, M6 = 10, M8 = 13 mm …), drawn at `NUT_SCALE` |
+| Nut hex width-across-flats | ISO 4032 (M3 = 5.5, M4 = 7, M5 = 8, M6 = 10, M8 = 13 mm …) |
+| Nut across-corners | ISO 4032 `e` — the corners are chamfered, not sharp |
 | Bolt head (WAF × height) | ISO 4017 |
-| Shaft Ø | nominal M-size (edge-measured, bleed-compensated) |
+| Shaft Ø | nominal M-size |
 | Shaft length | the mm value you give (`M5x50` → 50 mm) |
 | Wall plug Ø × length | the values you give (`SX6x30` → Ø6 × 30 mm, collar included) |
 
-Nuts are the exception to true-size: an outlined hex reads bigger than the nut you
-hold against it, because the line sits outside the shape, thermal bleed thickens it
-and the drawn corners are sharp where a real nut's are chamfered. So nuts are drawn
-at `NUT_SCALE` (0.8) — hex and hole together, keeping the proportions of the real
-nut. Raise it toward 1.0 if your printer bleeds less.
+Everything is drawn at nominal size, with no compensation of any kind. Note that nut
+tolerance is one-sided — ISO 4032 allows 9.78–10.00 mm across the flats for M6 — so a
+real nut measures a little under the drawing. Scale `WAF` in `gen.py` if you'd rather
+match your own stock.
 
-For screws the identifying dimensions — **shaft Ø × length** — do print true size;
-the head is a visual cue (drawn ISO hex-bolt size, ~5.5 mm across for M3, and varies in reality
-by head type). The printable area is **36.8 × 11.25 mm** (the S001 head is 12 mm but
-the protocol reserves 6 dots; the label's first ~5 mm is a dead zone), so a nut
-wider than 11.25 mm or a screw longer than ~34 mm runs off the edge — intentional.
-Keep the `tag_90r_90p` preset and, on a new printer, measure your first sticker and
-tune `FEED_CAL` in `gen.py` if the length is off.
+For screws the identifying dimensions — **shaft Ø × length** — print true size; the
+head is a visual cue (drawn ISO hex-bolt size, ~5.5 mm across for M3, and varies in
+reality by head type). The printable area is **35 × 11.25 mm** (the S001 head is
+12 mm but the protocol reserves 6 dots; the label's first ~5 mm is a dead zone), so
+a nut wider than 11.25 mm or a screw longer than ~34 mm runs off the edge —
+intentional. Keep the `tag_90r_90p` preset, and keep margin trimming off.
 
 ## Requirements
 

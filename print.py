@@ -52,8 +52,12 @@ class Printer:
         if idle > 0:
             time.sleep(idle)
         # TiMini runs with cwd in its own checkout, so pass an absolute path.
+        # Trimming is ON by default: it crops the white margin off the label and
+        # scales what's left to fill the paper, by a different factor for every
+        # sticker. That silently destroys true-size printing, so it must be off.
         cmd = [sys.executable, "-m", "timiniprint", "--serial", self.serial,
                "--printer-model", self.model, "--paper", self.paper,
+               "--no-trim-side-margins", "--no-trim-top-bottom-margins",
                os.path.abspath(png)]
         try:
             return subprocess.run(cmd, cwd=self.timini).returncode == 0
