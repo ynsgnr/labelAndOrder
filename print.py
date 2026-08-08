@@ -106,7 +106,8 @@ def main(argv=None):
     p.add_argument("folder", help="folder of .png stickers (from gen.py)")
     p.add_argument("--serial", default="COM5")
     p.add_argument("--model", default="orgstra_s001")
-    p.add_argument("--paper", default="tag_90r_90p", help="1:1 preset (render 90 / length 280)")
+    p.add_argument("--paper", default="yk_s001_tag_90r_90p",
+                   help="1:1 preset (render 90 / length 280)")
     p.add_argument("--count", type=int, default=1, metavar="N",
                    help="copies of each sticker (default: 1)")
     p.add_argument("--delay", type=float, default=2.0, metavar="S",
