@@ -4,13 +4,16 @@ Depends on TiMini-Print (the S001 label-printer driver):
     https://github.com/ynsgnr/TiMini-Print
 Point --timini (or the TIMINI_DIR env var) at your local TiMini-Print checkout.
 
-Prints ONE sticker first, waits for your approval, then prints the rest.
+Waits for Enter before EACH sticker, so you can check the last one and reposition
+the roll instead of the printer running the whole batch non-stop.
 
-    py print.py out                           # test first, prompt, then the rest
-    py print.py out --yes                     # print everything, no prompt
+    py print.py out                           # Enter prints the next one
+    py print.py out --yes                     # print everything, no prompts
     py print.py out --test                    # print only the first, then stop
-    py print.py out --rest                    # print all except the first
+    py print.py out --rest                    # skip the first, prompt for the rest
     py print.py out --serial COM5 --paper tag_90r_90p --timini ../TiMini-Print
+
+At each prompt: Enter = print it, s = skip it, q = stop.
 
 The generator already draws stickers at the S001's true printed size (including the
 paper-advance/length calibration), so this just streams each PNG to TiMini as-is.
@@ -43,7 +46,7 @@ def main(argv=None):
     g = p.add_mutually_exclusive_group()
     g.add_argument("--yes", action="store_true", help="print all without prompting")
     g.add_argument("--test", action="store_true", help="print only the first, then stop")
-    g.add_argument("--rest", action="store_true", help="print all except the first")
+    g.add_argument("--rest", action="store_true", help="skip the first, prompt for the rest")
     args = p.parse_args(argv)
 
     if not args.timini or not os.path.isdir(args.timini):
@@ -59,9 +62,6 @@ def main(argv=None):
         for png in items:
             print_one(png, args.serial, args.model, args.paper, args.timini)
 
-    if args.rest:
-        run(pngs[1:])
-        return
     if args.test:
         print(f"test print (1 of {len(pngs)}):")
         run(pngs[:1])
@@ -70,17 +70,21 @@ def main(argv=None):
         print(f"printing all {len(pngs)}:")
         run(pngs)
         return
+    if args.rest:
+        pngs = pngs[1:]
 
-    # interactive: one test print, then confirm the rest
-    print(f"test print (1 of {len(pngs)}):")
-    run(pngs[:1])
-    if len(pngs) == 1:
-        return
-    ans = input(f"Looks good? print the remaining {len(pngs) - 1}? [y/N] ").strip().lower()
-    if ans == "y":
-        run(pngs[1:])
-    else:
-        print("stopped; rerun with --rest to print the remaining stickers.")
+    # one at a time: nothing prints until you press Enter for it
+    print(f"{len(pngs)} stickers — Enter prints the next, 's' skips it, 'q' stops.")
+    total = len(pngs)
+    for i, png in enumerate(pngs, 1):
+        ans = input(f"[{i}/{total}] {os.path.basename(png)} > ").strip().lower()
+        if ans == "q":
+            print(f"stopped at {i} of {total}.")
+            return
+        if ans == "s":
+            continue
+        print_one(png, args.serial, args.model, args.paper, args.timini)
+    print(f"done ({total} stickers).")
 
 
 if __name__ == "__main__":

@@ -80,8 +80,9 @@ env var) at your checkout:
 uv run print.py out --serial COM5 --timini ../TiMini-Print
 ```
 
-- Prints one sticker, then asks whether to print the rest.
-- `--yes` print all without prompting · `--test` first only · `--rest` all but the first.
+- Prompts before **each** sticker: Enter prints it, `s` skips it, `q` stops — so
+  you can check the last label and reposition the roll between prints.
+- `--yes` print all without prompting · `--test` first only · `--rest` skip the first.
 - `--paper tag_90r_90p` is the **1:1 preset** (render 90 / length 280) — keep it so
   the fastener prints at true size.
 
