@@ -8,12 +8,14 @@ Waits for Enter before EACH sticker, so you can check the last one and repositio
 the roll instead of the printer running the whole batch non-stop.
 
     py print.py out                           # Enter prints the next one
+    py print.py out --count 2                 # 2 copies of every sticker
     py print.py out --yes                     # print everything, no prompts
     py print.py out --test                    # print only the first, then stop
     py print.py out --rest                    # skip the first, prompt for the rest
     py print.py out --serial COM5 --paper tag_90r_90p --timini ../TiMini-Print
 
-At each prompt: Enter = print it, s = skip it, q = stop.
+At each prompt: Enter = print --count copies, a number = that many copies of this
+one, s = skip it, q = stop.
 
 The generator already draws stickers at the S001's true printed size (including the
 paper-advance/length calibration), so this just streams each PNG to TiMini as-is.
@@ -26,12 +28,14 @@ import subprocess
 import sys
 
 
-def print_one(png, serial, model, paper, timini_dir) -> None:
+def print_one(png, serial, model, paper, timini_dir, count=1) -> None:
     # TiMini runs with cwd in its own checkout, so pass an absolute sticker path.
     cmd = [sys.executable, "-m", "timiniprint", "--serial", serial,
            "--printer-model", model, "--paper", paper, os.path.abspath(png)]
-    print(f"  -> {os.path.basename(png)}")
-    subprocess.run(cmd, cwd=timini_dir, check=True)
+    for n in range(1, count + 1):
+        suffix = f"  (copy {n}/{count})" if count > 1 else ""
+        print(f"  -> {os.path.basename(png)}{suffix}")
+        subprocess.run(cmd, cwd=timini_dir, check=True)
 
 
 def main(argv=None):
@@ -40,6 +44,8 @@ def main(argv=None):
     p.add_argument("--serial", default="COM5")
     p.add_argument("--model", default="orgstra_s001")
     p.add_argument("--paper", default="tag_90r_90p", help="1:1 preset (render 90 / length 280)")
+    p.add_argument("--count", type=int, default=1, metavar="N",
+                   help="copies of each sticker (default: 1)")
     p.add_argument("--timini", default=os.environ.get("TIMINI_DIR"),
                    help="path to a TiMini-Print checkout (or set TIMINI_DIR); "
                         "https://github.com/ynsgnr/TiMini-Print")
@@ -58,23 +64,28 @@ def main(argv=None):
     if not pngs:
         sys.exit(f"no .png stickers in {args.folder!r}")
 
-    def run(items):
-        for png in items:
-            print_one(png, args.serial, args.model, args.paper, args.timini)
+    if args.count < 1:
+        sys.exit("--count must be 1 or more")
 
+    def run(items, count):
+        for png in items:
+            print_one(png, args.serial, args.model, args.paper, args.timini, count)
+
+    each = f" x{args.count}" if args.count > 1 else ""
     if args.test:
-        print(f"test print (1 of {len(pngs)}):")
-        run(pngs[:1])
+        print(f"test print (1 of {len(pngs)}){each}:")
+        run(pngs[:1], args.count)
         return
     if args.yes:
-        print(f"printing all {len(pngs)}:")
-        run(pngs)
+        print(f"printing all {len(pngs)}{each}:")
+        run(pngs, args.count)
         return
     if args.rest:
         pngs = pngs[1:]
 
     # one at a time: nothing prints until you press Enter for it
-    print(f"{len(pngs)} stickers — Enter prints the next, 's' skips it, 'q' stops.")
+    print(f"{len(pngs)} stickers{each} — Enter prints the next, a number prints that "
+          f"many copies, 's' skips it, 'q' stops.")
     total = len(pngs)
     for i, png in enumerate(pngs, 1):
         ans = input(f"[{i}/{total}] {os.path.basename(png)} > ").strip().lower()
@@ -83,7 +94,12 @@ def main(argv=None):
             return
         if ans == "s":
             continue
-        print_one(png, args.serial, args.model, args.paper, args.timini)
+        count = args.count
+        if ans.isdigit():
+            count = int(ans)
+            if count < 1:
+                continue          # '0' -> skip
+        print_one(png, args.serial, args.model, args.paper, args.timini, count)
     print(f"done ({total} stickers).")
 
 

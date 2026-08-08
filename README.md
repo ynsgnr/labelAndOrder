@@ -80,8 +80,11 @@ env var) at your checkout:
 uv run print.py out --serial COM5 --timini ../TiMini-Print
 ```
 
-- Prompts before **each** sticker: Enter prints it, `s` skips it, `q` stops — so
-  you can check the last label and reposition the roll between prints.
+- Prompts before **each** sticker: Enter prints it, a number prints that many
+  copies of it, `s` skips it, `q` stops — so you can check the last label and
+  reposition the roll between prints.
+- `--count N` prints N copies of every sticker (default 1) — `--count 3` for a
+  drawer that needs three of each.
 - `--yes` print all without prompting · `--test` first only · `--rest` skip the first.
 - `--paper tag_90r_90p` is the **1:1 preset** (render 90 / length 280) — keep it so
   the fastener prints at true size.
