@@ -15,12 +15,13 @@ DPMM = 8
 W, H = 280, 90                           # length x head, in dots
 BLACK, WHITE = 0, 1
 
-# Length-axis (paper advance) pitch relative to the head's 8 dot/mm. Measured on
-# an S001 by printing a nut and measuring its hole, which is drawn as a true
-# circle: 9.8 mm across the head axis vs 8.4 mm along the feed — i.e. the feed
-# also runs at ~8 dot/mm and needs no correction. Lower this if your printer
-# feeds long (a feature comes out longer than drawn), raise it if it feeds short.
-FEED_CAL = 1.0
+# Length-axis (paper advance) pitch relative to the head's 8 dot/mm. Calibrated on
+# an S001 from two printed features that bracket the thermal bleed: a nut hole
+# (INNER edge, bleed shrinks it) drawn 67.4 px measured 8.4 mm, and a screw shaft
+# (OUTER edge, bleed grows it) drawn 96 px measured 13.0 mm. One scale plus one
+# bleed constant fits both — the feed runs at ~7.6 dot/mm. To recalibrate: print a
+# screw, measure the shaft, and set FEED_CAL = nominal / (measured - LINE_BLEED/DPMM).
+FEED_CAL = 0.95
 FEED_DPMM = DPMM * FEED_CAL               # dots per mm along the label length
 LEN_MM, HEAD_MM = W / FEED_DPMM, H / DPMM  # ~41.5 x 11.25 mm printable
 
@@ -107,7 +108,9 @@ def draw_screw(d: ImageDraw.ImageDraw, x0, cy, m, length_mm, band_h, shape="hex"
     # Shaft Ø is measured outer-to-outer, so subtract the outline+bleed (~0.4 mm)
     # so the printed diameter equals the true m mm.
     shaft_h = min(m * DPMM - LINE_BLEED, band_h - 4)
-    shaft_len = length_mm * FEED_DPMM
+    # Length is edge-measured too (head underside to tip), so it gets the same
+    # bleed subtraction as the diameter.
+    shaft_len = length_mm * FEED_DPMM - LINE_BLEED
     ht, hb = cy - head_h / 2, cy + head_h / 2
     st, sb = cy - shaft_h / 2, cy + shaft_h / 2
     if shape == "pan":
@@ -129,7 +132,7 @@ def draw_plug(d: ImageDraw.ImageDraw, x0, cy, dia_mm, length_mm, band_h):
     a collar (wall-face lip), a ribbed expansion sleeve and the expansion slot.
     Ø and length are true scale — length uses FEED_DPMM, the section uses DPMM."""
     body_h = min(dia_mm * DPMM - LINE_BLEED, band_h - 4)
-    total = length_mm * FEED_DPMM                    # collar is part of the length
+    total = length_mm * FEED_DPMM - LINE_BLEED       # collar is part of the length
     collar_w = max(3.0, 1.0 * FEED_DPMM)             # ~1 mm lip
     collar_h = min(dia_mm * 1.3 * DPMM - LINE_BLEED, band_h)
     top, bot = cy - body_h / 2, cy + body_h / 2
