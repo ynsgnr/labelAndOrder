@@ -73,11 +73,7 @@ def _hex_points(cx, cy, waf_mm):
 
 
 NUT_SHRINK_MM = 1.0   # draw the hex 1 mm under WAF so the thin line traces the nut edge
-
-def nut_half_width(m):
-    """Half-extent along the length axis (px) of the drawn hex, for alignment."""
-    waf = WAF.get(m, m * 1.6) - NUT_SHRINK_MM
-    return (waf / 2) / math.cos(math.radians(30)) * FEED_DPMM
+NUT_CENTRE_FRAC = 1 / 3   # nut centre sits this fraction of the length in from the right
 
 def draw_nut(d: ImageDraw.ImageDraw, cx, cy, m, nylon=False):
     waf = WAF.get(m, m * 1.6) - NUT_SHRINK_MM
@@ -196,7 +192,11 @@ def make_label(kind: str, m: float, length: float | None = None,
         f_big, f_sub = _font(40), _font(20)
         d.text((pad, 1), f"M{m:g}", font=f_big, fill=BLACK)
         d.text((pad, 43), "Nylon" if shape == "nylon" else "Nuts", font=f_sub, fill=BLACK)
-        cx = int(W - pad - nut_half_width(m))          # right-align the nut
+        # Nut centred a third of the label length in from the right edge: small
+        # nuts sat against the edge when right-aligned, which put them on the
+        # sticker's rounded corner and made them awkward to compare against a
+        # real nut. Big nuts still overhang symmetrically from here.
+        cx = int(W - NUT_CENTRE_FRAC * W)
         draw_nut(d, cx, cy, m, nylon=(shape == "nylon"))
     elif kind == "plug":
         # same layout as a screw; `shape` carries an optional range prefix (SX, UX…)
