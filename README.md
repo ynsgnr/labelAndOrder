@@ -103,14 +103,20 @@ README for pairing).
 
 | Item | Standard |
 |------|----------|
-| Nut hex width-across-flats | ISO 4032 (M3 = 5.5, M4 = 7, M5 = 8, M6 = 10, M8 = 13 mm …) |
+| Nut hex width-across-flats | ISO 4032 (M3 = 5.5, M4 = 7, M5 = 8, M6 = 10, M8 = 13 mm …), drawn at `NUT_SCALE` |
 | Bolt head (WAF × height) | ISO 4017 |
 | Shaft Ø | nominal M-size (edge-measured, bleed-compensated) |
 | Shaft length | the mm value you give (`M5x50` → 50 mm) |
 | Wall plug Ø × length | the values you give (`SX6x30` → Ø6 × 30 mm, collar included) |
 
-The identifying dimensions — **shaft Ø × length** — print true size; the head is a
-visual cue (drawn ISO hex-bolt size, ~5.5 mm across for M3, and varies in reality
+Nuts are the exception to true-size: an outlined hex reads bigger than the nut you
+hold against it, because the line sits outside the shape, thermal bleed thickens it
+and the drawn corners are sharp where a real nut's are chamfered. So nuts are drawn
+at `NUT_SCALE` (0.8) — hex and hole together, keeping the proportions of the real
+nut. Raise it toward 1.0 if your printer bleeds less.
+
+For screws the identifying dimensions — **shaft Ø × length** — do print true size;
+the head is a visual cue (drawn ISO hex-bolt size, ~5.5 mm across for M3, and varies in reality
 by head type). The printable area is **36.8 × 11.25 mm** (the S001 head is 12 mm but
 the protocol reserves 6 dots; the label's first ~5 mm is a dead zone), so a nut
 wider than 11.25 mm or a screw longer than ~34 mm runs off the edge — intentional.

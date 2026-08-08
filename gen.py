@@ -48,12 +48,17 @@ WAF = {1: 2.5, 1.6: 3.2, 2: 4, 2.5: 5, 3: 5.5, 4: 7, 5: 8, 6: 10,
 HEX_BOLT = {2: (4, 1.4), 2.5: (5, 1.7), 3: (5.5, 2.0), 4: (7, 2.8), 5: (8, 3.5),
             6: (10, 4.0), 8: (13, 5.3), 10: (17, 6.4), 12: (19, 7.5), 16: (24, 10.0)}
 
-NUT_BIAS_MM = 0.0     # nudge every nut's width across flats; 0 = true ISO size
+# A hex drawn to ISO reads larger than the real nut held against it: the outline
+# sits outside the shape, thermal bleed thickens it, and the drawn corners are
+# sharp where a real nut's are chamfered. Scaled down rather than offset by a
+# fixed amount, which at M2 would leave the hex no bigger than its own hole.
+# Anchored on M6 measured against real nuts: 10 mm flats drawn as 8.
+NUT_SCALE = 0.8
 
 
 def nut_waf(m: float) -> float:
-    """Nut width across flats (mm), extrapolated for sizes outside the table."""
-    return WAF.get(m, m * 1.6) + NUT_BIAS_MM
+    """Drawn nut width across flats (mm), extrapolated outside the table."""
+    return WAF.get(m, m * 1.6) * NUT_SCALE
 
 
 def bolt_head(m: float) -> tuple[float, float]:
@@ -106,19 +111,22 @@ def _mm_arc_pts(cx, cy, angles, r_mm):
 
 
 def draw_nut(d: ImageDraw.ImageDraw, cx, cy, m, nylon=False):
-    """Hex nut, face on. The outline is an outer edge and the hole an inner one,
+    """Hex nut, face on. Hex and hole are both scaled by NUT_SCALE so the icon
+    stays in proportion. The outline is an outer edge and the hole an inner one,
     so bleed is compensated in opposite directions."""
-    waf = nut_waf(m)
+    waf, hole = nut_waf(m), m * NUT_SCALE
     circumradius = (waf - LINE_BLEED / DPMM) / 2 / math.cos(math.radians(30))
     d.polygon(_mm_arc_pts(cx, cy, range(0, 360, 60), circumradius), outline=BLACK, width=2)
 
-    rx = (m / 2) * FEED_DPMM + LINE_BLEED / 2
-    ry = (m / 2) * DPMM + LINE_BLEED / 2
+    # Radii keep the FEED_DPMM:DPMM ratio so the hole prints round; the bleed
+    # term is a dot-level effect and so is the same on both axes.
+    rx = (hole / 2) * FEED_DPMM + LINE_BLEED / 2
+    ry = (hole / 2) * DPMM + LINE_BLEED / 2
     d.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], outline=BLACK, width=2)
 
     if nylon:
         # nyloc insert: a dotted ring between hole and hex, which reads as grey
-        for x, y in _mm_arc_pts(cx, cy, range(0, 360, 15), (m / 2 + waf / 2) / 2):
+        for x, y in _mm_arc_pts(cx, cy, range(0, 360, 15), (hole / 2 + waf / 2) / 2):
             d.ellipse([x - 1, y - 1, x + 1, y + 1], fill=BLACK)
 
 
@@ -305,7 +313,9 @@ def describe(spec) -> str:
     kind, m, length, shape, drive = spec
     if kind == "nut":
         variant = " nyloc" if shape == "nylon" else ""
-        return f"M{m:g}{variant} nut: hex WAF {nut_waf(m):g} mm, hole Ø{m:g} mm"
+        # the real nut being labelled, not the NUT_SCALE-reduced drawing
+        return (f"M{m:g}{variant} nut: hex WAF {WAF.get(m, m * 1.6):g} mm, "
+                f"hole Ø{m:g} mm, drawn at {NUT_SCALE:g}x")
     if kind == "plug":
         return (f"{shape + ' ' if shape else ''}{m:g}x{length:g}: "
                 f"wall plug, Ø{m:g}x{length:g} mm")
