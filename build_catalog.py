@@ -31,7 +31,7 @@ SCREW_LENGTHS = {
     8: [10, 12, 16, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70],
 }
 HEAD_SHAPES = ["hex", "pan", "csk"]          # the three profiles gen.py draws
-DRIVES = ["philips", "allen", "torx"]        # the drives people actually meet
+DRIVES = ["philips", "allen", "torx", "slot"]   # the drives people actually meet
 
 # Wall plugs, in the sizes the common drill bits give you.
 PLUGS = [("SX", 5, 25), ("SX", 6, 30), ("SX", 6, 40),

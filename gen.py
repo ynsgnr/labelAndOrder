@@ -124,7 +124,10 @@ HEAD_SHAPES = {"hex": "hex", "bolt": "hex",
 DRIVES = {"philips": "cross", "phillips": "cross", "ph": "cross", "cross": "cross",
           "pozi": "pozi", "pozidriv": "pozi", "pz": "pozi",
           "torx": "torx", "star": "torx", "tx": "torx", "t": "torx",
+          # 'flat' would be the natural alias here but it already means the
+          # countersunk head profile, so the flat-blade drive is 'slot'
           "slot": "slot", "slotted": "slot", "sl": "slot",
+          "flathead": "slot", "flatblade": "slot", "straight": "slot",
           "square": "square", "robertson": "square", "sq": "square",
           "allen": "hex", "socket": "hex", "hexkey": "hex"}
 NUT_TYPES = {"nylon": "nylon", "nyloc": "nylon", "nylock": "nylon",
@@ -234,7 +237,9 @@ def draw_drive(d: ImageDraw.ImageDraw, cx, cy, r, kind):
             d.line([cx - h, cy - h, cx + h, cy + h], fill=BLACK, width=1)
             d.line([cx - h, cy + h, cx + h, cy - h], fill=BLACK, width=1)
     elif icon == "slot":
-        d.line([cx - ir, cy, cx + ir, cy], fill=BLACK, width=3)
+        # a real flat-head slot runs the full width of the head, so the line
+        # reaches the rim rather than floating inside it
+        d.line([cx - r, cy, cx + r, cy], fill=BLACK, width=3)
     elif icon == "torx":                         # solid 6-point star
         pts = [p for i in range(12)
                for p in _arc_pts(cx, cy, [i * 30 - 90], ir if i % 2 == 0 else ir * 0.5)]

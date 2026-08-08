@@ -18,7 +18,7 @@ on an Orgstra **S001** (Xinye) label printer via
 ## Just print them
 
 The whole catalogue is **pre-generated and committed** — clone and print, no Python
-needed. One folder per label template, 675 stickers each:
+needed. One folder per label template, 951 stickers each:
 
 | Folder | Label | Dots | Printers |
 |---|---|---|---|
@@ -96,6 +96,7 @@ uv run gen.py M3 M5 M8 M5x50 M4x20 --out out --sheet
 | `csk` (`flat`, `countersunk`) | screw | flat face, countersunk taper into the shaft |
 | `hex` (default) | screw | flat hex-bolt head block |
 | `philips` `pozi` `torx` `slot` `square` `allen` | screw | drive icon in the top-right |
+| | | `slot` (`flathead`, `straight`) is the flat-blade drive — `flat` on its own means the countersunk *head*, not the drive |
 | `plug` (`anchor`, `dowel`, `wallplug`) | — | draws a wall plug instead: collar, ribbed sleeve, expansion slot, no drive icon |
 
 Examples: `M5:nylon` · `M4x20:pan:philips` · `M5x30:csk:pozi` · `M3x8:torx` · `SX6x30:plug`
@@ -119,8 +120,8 @@ uv run print.py s001-12x40mm --serial COM5 --timini ../TiMini-Print
   the next, so consecutive prints are spaced by `--delay` seconds (default 2).
   A job that still fails is offered for retry — it won't abort the batch.
 - `--yes` print all without prompting · `--test` first only · `--rest` skip the first.
-- `--paper tag_90r_90p` is the **1:1 preset** (render 90 / length 280) — keep it so
-  the fastener prints at true size.
+- `--paper yk_s001_tag_90r_90p` is the **1:1 preset** (render 90 / length 280) —
+  keep it so the fastener prints at true size.
 
 The S001 must be paired and exposed as a serial/SPP COM port (see the TiMini-Print
 README for pairing).
