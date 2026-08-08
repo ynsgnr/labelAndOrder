@@ -85,6 +85,9 @@ uv run print.py out --serial COM5 --timini ../TiMini-Print
   reposition the roll between prints.
 - `--count N` prints N copies of every sticker (default 1) — `--count 3` for a
   drawer that needs three of each.
+- The S001 drops its SPP port after every job and needs a moment before it accepts
+  the next, so consecutive prints are spaced by `--delay` seconds (default 2).
+  A job that still fails is offered for retry — it won't abort the batch.
 - `--yes` print all without prompting · `--test` first only · `--rest` skip the first.
 - `--paper tag_90r_90p` is the **1:1 preset** (render 90 / length 280) — keep it so
   the fastener prints at true size.
